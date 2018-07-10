@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from multiprocessing import Pool
+from multiprocessing import Pool, Manager
 
 from azext_imagecopy.cli_utils import run_cli_command, prepare_cli_command
 from azext_imagecopy.create_target import create_target_image
@@ -119,7 +119,8 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
         azure_pool_frequency = 10
 
     tasks = []
-    manifest = {}
+    m = Manager()
+    manifest = m.dict()
     for location in target_location:
         location = location.strip()
         tasks.append((location, transient_resource_group_name, source_type,
@@ -166,6 +167,7 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
         run_cli_command(cli_cmd)
 
         if manifest_file is not None:
+            manifest = dict(manifest)
             logger.warn("Writing manifest %s to %s", pprint.pformat(manifest), manifest_file)
             with open(manifest_file, "w+") as f:
                 f.write(json.dumps(manifest))

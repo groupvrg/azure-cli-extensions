@@ -10,6 +10,7 @@ from azext_imagecopy.cli_utils import run_cli_command, prepare_cli_command
 from knack.util import CLIError
 
 from knack.log import get_logger
+import pprint
 logger = get_logger(__name__)
 
 STORAGE_ACCOUNT_NAME_LENGTH = 24
@@ -142,7 +143,9 @@ def create_target_image(location, transient_resource_group_name, source_type, so
 
     run_cli_command(cli_cmd)
 
+    logger.warn("Updating manifest object")
     manifest[location] = target_image_name
+    logger.warn("Manifest object state: %s", pprint.pformat(manifest))
 
 
 
