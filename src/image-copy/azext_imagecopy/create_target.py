@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 
 STORAGE_ACCOUNT_NAME_LENGTH = 24
 
+logger.info("Running cbn custom image copy code")
 
 # pylint: disable=too-many-locals
 def create_target_image(location, transient_resource_group_name, source_type, source_object_name,
