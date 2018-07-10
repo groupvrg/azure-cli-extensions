@@ -10,13 +10,15 @@ from azext_imagecopy.create_target import create_target_image
 
 from knack.util import CLIError
 from knack.log import get_logger
+import json, pprint
 logger = get_logger(__name__)
 
 
 # pylint: disable=too-many-statements
 def imagecopy(source_resource_group_name, source_object_name, target_location,
               target_resource_group_name, source_type='image', cleanup='false',
-              parallel_degree=-1, tags=None, target_name=None):
+              parallel_degree=-1, tags=None, target_name=None, manifest_file=None,
+              temp_resource_group_name='image-copy-rg'):
 
     # get the os disk id from source vm/image
     logger.warn("Getting os disk id of the source vm/image")
@@ -91,7 +93,8 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
 
     # Start processing in the target locations
 
-    transient_resource_group_name = 'image-copy-rg'
+    transient_resource_group_name = temp_resource_group_name
+    logger.info("temp resource group name is %s", transient_resource_group_name)
     # pick the first location for the temp group
     transient_resource_group_location = target_location[0].strip()
     create_resource_group(transient_resource_group_name,
@@ -116,12 +119,13 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
         azure_pool_frequency = 10
 
     tasks = []
+    manifest = {}
     for location in target_location:
         location = location.strip()
         tasks.append((location, transient_resource_group_name, source_type,
                       source_object_name, source_os_disk_snapshot_name, source_os_disk_snapshot_url,
                       source_os_type, target_resource_group_name, azure_pool_frequency,
-                      tags, target_name))
+                      tags, target_name, manifest))
 
     logger.warn("Starting async process for all locations")
 
@@ -160,6 +164,11 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
                                        '--name', source_os_disk_snapshot_name,
                                        '--resource-group', source_resource_group_name])
         run_cli_command(cli_cmd)
+
+        if manifest_file is not None:
+            logger.warn("Writing manifest %s to %s", pprint.pformat(manifest), manifest_file)
+            with open(manifest_file, "w+") as f:
+                f.write(json.dumps(manifest))
 
 
 def create_resource_group(resource_group_name, location):

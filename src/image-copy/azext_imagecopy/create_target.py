@@ -14,12 +14,11 @@ logger = get_logger(__name__)
 
 STORAGE_ACCOUNT_NAME_LENGTH = 24
 
-logger.info("Running cbn custom image copy code")
 
 # pylint: disable=too-many-locals
 def create_target_image(location, transient_resource_group_name, source_type, source_object_name,
                         source_os_disk_snapshot_name, source_os_disk_snapshot_url, source_os_type,
-                        target_resource_group_name, azure_pool_frequency, tags, target_name):
+                        target_resource_group_name, azure_pool_frequency, tags, target_name, manifest):
 
     subscription_id = get_subscription_id()
 
@@ -97,19 +96,29 @@ def create_target_image(location, transient_resource_group_name, source_type, so
         location, datetime.datetime.now() - start_datetime)
     logger.warn(msg)
 
+
     # Create the snapshot in the target region from the copied blob
     logger.warn(
         "%s - Creating snapshot in target region from the copied blob", location)
     target_blob_path = target_blob_endpoint + \
         target_container_name + '/' + blob_name
     target_snapshot_name = source_os_disk_snapshot_name + '-' + location
-    cli_cmd = prepare_cli_command(['snapshot', 'create',
-                                   '--resource-group', transient_resource_group_name,
-                                   '--name', target_snapshot_name,
-                                   '--location', location,
-                                   '--source', target_blob_path])
 
-    json_output = run_cli_command(cli_cmd, return_as_json=True)
+    logger.warn("Sleeping for 30 seconds")
+
+    create_snapshot_retry_count = 0
+    while create_snapshot_retry_count < 10:
+        create_snapshot_retry_count += 1
+        try:
+            logger.warn("Trying to create snapshot from vhd, try %d/10",create_snapshot_retry_count)
+            json_output = create_snapshot_from_vhd(location, target_blob_path, target_snapshot_name,
+                                                   transient_resource_group_name)
+            break
+        except Exception as ex:
+            logger.warn("Failed to create snapshot, ex: %s", str(ex))
+            logger.warn("Sleeping for 30 seconds")
+            time.sleep(30)
+
     target_snapshot_id = json_output['id']
 
     # Create the final image
@@ -122,6 +131,7 @@ def create_target_image(location, transient_resource_group_name, source_type, so
     else:
         target_image_name = target_name
 
+
     cli_cmd = prepare_cli_command(['image', 'create',
                                    '--resource-group', target_resource_group_name,
                                    '--name', target_image_name,
@@ -132,18 +142,27 @@ def create_target_image(location, transient_resource_group_name, source_type, so
 
     run_cli_command(cli_cmd)
 
+    manifest[location] = target_image_name
+
+
+
+def create_snapshot_from_vhd(location, target_blob_path, target_snapshot_name,
+                             transient_resource_group_name):
+    cli_cmd = prepare_cli_command(['snapshot', 'create',
+                                   '--resource-group', transient_resource_group_name,
+                                   '--name', target_snapshot_name,
+                                   '--location', location,
+                                   '--source', target_blob_path])
+    json_output = run_cli_command(cli_cmd, return_as_json=True)
+    return json_output
+
 
 def wait_for_blob_copy_operation(blob_name, target_container_name, target_storage_account_name,
                                  azure_pool_frequency, location):
     copy_status = "pending"
     prev_progress = -1
     while copy_status == "pending":
-        cli_cmd = prepare_cli_command(['storage', 'blob', 'show',
-                                       '--name', blob_name,
-                                       '--container-name', target_container_name,
-                                       '--account-name', target_storage_account_name])
-
-        json_output = run_cli_command(cli_cmd, return_as_json=True)
+        json_output = get_blob_status(blob_name, target_container_name, target_storage_account_name)
         copy_status = json_output["properties"]["copy"]["status"]
         copy_progress_1, copy_progress_2 = json_output["properties"]["copy"]["progress"].split(
             "/")
@@ -168,6 +187,15 @@ def wait_for_blob_copy_operation(blob_name, target_container_name, target_storag
         logger.error(
             "The copy operation didn't succeed. Last status: %s", copy_status)
         raise CLIError('Blob copy failed')
+
+
+def get_blob_status(blob_name, target_container_name, target_storage_account_name):
+    cli_cmd = prepare_cli_command(['storage', 'blob', 'show',
+                                   '--name', blob_name,
+                                   '--container-name', target_container_name,
+                                   '--account-name', target_storage_account_name])
+    json_output = run_cli_command(cli_cmd, return_as_json=True)
+    return json_output
 
 
 def get_subscription_id():

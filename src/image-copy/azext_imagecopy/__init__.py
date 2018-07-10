@@ -41,6 +41,9 @@ class ImageCopyCommandsLoader(AzCommandsLoader):
                        help='Include this switch to delete temporary resources upon completion')
             c.argument('target_name', options_list=['--target-name'],
                        help='Name of the final image that will be created')
+            c.argument('manifest_file', options_list=['--manifest-file'], help="created images manifest file")
+            c.argument('temp_resource_group_name', options_list=['--temp-resource-group-name'], default="image-copy-rg",
+                       help="created images manifest file")
 
 
 COMMAND_LOADER_CLS = ImageCopyCommandsLoader
