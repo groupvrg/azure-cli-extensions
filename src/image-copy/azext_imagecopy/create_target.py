@@ -105,19 +105,19 @@ def create_target_image(location, transient_resource_group_name, source_type, so
         target_container_name + '/' + blob_name
     target_snapshot_name = source_os_disk_snapshot_name + '-' + location
 
-    logger.warn("Sleeping for 30 seconds")
+    logger.warn("%s -Sleeping for 30 seconds", location)
 
     create_snapshot_retry_count = 0
     while create_snapshot_retry_count < 10:
         create_snapshot_retry_count += 1
         try:
-            logger.warn("Trying to create snapshot from vhd, try %d/10",create_snapshot_retry_count)
+            logger.warn("%s - Trying to create snapshot from vhd, try %d/10",location, create_snapshot_retry_count)
             json_output = create_snapshot_from_vhd(location, target_blob_path, target_snapshot_name,
                                                    transient_resource_group_name)
             break
         except Exception as ex:
-            logger.warn("Failed to create snapshot, ex: %s", str(ex))
-            logger.warn("Sleeping for 30 seconds")
+            logger.warn("%s - Failed to create snapshot, ex: %s", location, str(ex))
+            logger.warn("%s - Sleeping for 30 seconds", location)
             time.sleep(30)
 
     target_snapshot_id = json_output['id']
@@ -143,9 +143,9 @@ def create_target_image(location, transient_resource_group_name, source_type, so
 
     run_cli_command(cli_cmd)
 
-    logger.warn("Updating manifest object")
+    logger.warn("%s - Updating manifest object", location)
     manifest[location] = target_image_name
-    logger.warn("Manifest object state: %s", pprint.pformat(manifest))
+    logger.warn("%s - Manifest object state: %s",location, pprint.pformat(manifest))
 
 
 
