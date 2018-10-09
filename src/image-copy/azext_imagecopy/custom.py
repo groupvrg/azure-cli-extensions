@@ -126,19 +126,20 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
         m = Manager()
         manifest = m.dict()
         for location in target_location:
+            logger.warn("Creating task for location: %s", location)
             location = location.strip()
             tasks.append((location, transient_resource_group_name, source_type,
                           source_object_name, source_os_disk_snapshot_name, source_os_disk_snapshot_url,
                           source_os_type, target_resource_group_name, azure_pool_frequency,
                           tags, target_name, target_subscription, manifest))
 
-            logger.warn("Starting async process of %d tasks for all locations", len(tasks))
+        logger.warn("Starting async process of %d tasks for all locations", len(tasks))
 
-            for task in tasks:
-                pool.apply_async(create_target_image, task)
+        for task in tasks:
+            pool.apply_async(create_target_image, task)
 
-            pool.close()
-            pool.join()
+        pool.close()
+        pool.join()
     except KeyboardInterrupt:
         logger.warn('User cancelled the operation')
         if cleanup:
