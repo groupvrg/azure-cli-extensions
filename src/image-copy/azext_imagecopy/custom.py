@@ -132,7 +132,7 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
                           source_os_type, target_resource_group_name, azure_pool_frequency,
                           tags, target_name, target_subscription, manifest))
 
-            logger.warn("Starting async process for all locations")
+            logger.warn("Starting async process of %d tasks for all locations", len(tasks))
 
             for task in tasks:
                 pool.apply_async(create_target_image, task)
@@ -206,9 +206,12 @@ def delete_all_created_images(dict_manifest, parallel_degree, target_locations_c
 
 def init_process_pool(parallel_degree, target_locations_count):
     if parallel_degree == -1:
+        logger.warn("using pool size: %d", target_locations_count)
         return Pool(target_locations_count)
     else:
-        return Pool(min(parallel_degree, target_locations_count))
+        poolsize = min(parallel_degree, target_locations_count)
+        logger.warn("using pool size: %d", poolsize)
+        return Pool(poolsize)
 
 
 def create_resource_group(resource_group_name, location, subscription=None):
