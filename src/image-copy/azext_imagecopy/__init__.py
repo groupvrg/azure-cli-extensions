@@ -44,6 +44,9 @@ class ImageCopyCommandsLoader(AzCommandsLoader):
             c.argument('manifest_file', options_list=['--manifest-file'], help="created images manifest file")
             c.argument('temp_resource_group_name', options_list=['--temp-resource-group-name'], default="image-copy-rg",
                        help="created images manifest file")
+            c.argument('target_subscription', options_list=['--target-subscription'],
+                       help='Name or ID of the subscription where the final image should be created.')
+
 
 
 COMMAND_LOADER_CLS = ImageCopyCommandsLoader
