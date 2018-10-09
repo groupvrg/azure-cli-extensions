@@ -16,10 +16,12 @@ logger = get_logger(__name__)
 
 # pylint: disable=too-many-statements
 # pylint: disable=too-many-locals
+
+
 def imagecopy(source_resource_group_name, source_object_name, target_location,
               target_resource_group_name, source_type='image', cleanup='false',
               parallel_degree=-1, tags=None, target_name=None, target_subscription=None, manifest_file=None,
-              temp_resource_group_name='image-copy-rg'):
+              temp_resource_group_name='image-copy-rg', verify=False):
 
     # get the os disk id from source vm/image
     logger.warn("Getting os disk id of the source vm/image")
@@ -118,35 +120,25 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
         elif target_locations_count >= 3:
             azure_pool_frequency = 10
 
-    tasks = []
-    m = Manager()
-    manifest = m.dict()
-    for location in target_location:
-        location = location.strip()
-        tasks.append((location, transient_resource_group_name, source_type,
-                      source_object_name, source_os_disk_snapshot_name, source_os_disk_snapshot_url,
-                      source_os_type, target_resource_group_name, azure_pool_frequency,
-                      tags, target_name, manifest))
-        if parallel_degree == -1:
-            pool = Pool(target_locations_count)
-        else:
-            pool = Pool(min(parallel_degree, target_locations_count))
+        pool = init_process_pool(parallel_degree, target_locations_count)
 
         tasks = []
+        m = Manager()
+        manifest = m.dict()
         for location in target_location:
             location = location.strip()
             tasks.append((location, transient_resource_group_name, source_type,
                           source_object_name, source_os_disk_snapshot_name, source_os_disk_snapshot_url,
                           source_os_type, target_resource_group_name, azure_pool_frequency,
-                          tags, target_name, target_subscription))
+                          tags, target_name, target_subscription, manifest))
 
-        logger.warn("Starting async process for all locations")
+            logger.warn("Starting async process for all locations")
 
-        for task in tasks:
-            pool.apply_async(create_target_image, task)
+            for task in tasks:
+                pool.apply_async(create_target_image, task)
 
-        pool.close()
-        pool.join()
+            pool.close()
+            pool.join()
     except KeyboardInterrupt:
         logger.warn('User cancelled the operation')
         if cleanup:
@@ -178,11 +170,45 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
                                        '--resource-group', source_resource_group_name])
         run_cli_command(cli_cmd)
 
-        if manifest_file is not None:
-            manifest = dict(manifest)
-            logger.warn("Writing manifest %s to %s", pprint.pformat(manifest), manifest_file)
-            with open(manifest_file, "w+") as f:
-                f.write(json.dumps(manifest))
+    if manifest_file is not None:
+        dict_manifest = dict(manifest)
+        logger.warn("Writing manifest %s to %s", pprint.pformat(dict_manifest), manifest_file)
+        with open(manifest_file, "w+") as f:
+            f.write(json.dumps(dict_manifest))
+
+    #Verify
+    if verify:
+        logger.warn("verifying images created on all regions")
+        dict_manifest = dict(manifest)
+        for location in target_location:
+            location = location.strip()
+            if location not in manifest:
+                logger.error("location: %s not found in manifest", location)
+                logger.error("verification failed try to delete all images")
+                delete_all_created_images(dict_manifest, parallel_degree, target_locations_count, target_resource_group_name)
+                exit(1)
+
+
+def delete_all_created_images(dict_manifest, parallel_degree, target_locations_count, target_resource_group_name):
+    pool = init_process_pool(parallel_degree, target_locations_count)
+
+    image_delete_cmds = []
+    for location, image in dict_manifest.items():
+        logger.warn("create delete image command for image: %s, location", image, location)
+        image_delete_cmds.append(prepare_cli_command(['image', 'delete', '--name', image, '--resource-group', target_resource_group_name]))
+
+    for delete_cmd in image_delete_cmds:
+        pool.apply_async(run_cli_command, delete_cmd)
+
+    pool.close()
+    pool.join()
+
+
+def init_process_pool(parallel_degree, target_locations_count):
+    if parallel_degree == -1:
+        return Pool(target_locations_count)
+    else:
+        return Pool(min(parallel_degree, target_locations_count))
 
 
 def create_resource_group(resource_group_name, location, subscription=None):
