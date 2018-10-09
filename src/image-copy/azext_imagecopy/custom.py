@@ -195,7 +195,7 @@ def delete_all_created_images(dict_manifest, parallel_degree, target_locations_c
 
     image_delete_cmds = []
     for location, image in dict_manifest.items():
-        logger.warn("create delete image command for image: %s, location", image, location)
+        logger.warn("create delete image command for image: %s, location: %s", image, location)
         image_delete_cmds.append(prepare_cli_command(['image', 'delete', '--name', image, '--resource-group', target_resource_group_name]))
 
     for delete_cmd in image_delete_cmds:
