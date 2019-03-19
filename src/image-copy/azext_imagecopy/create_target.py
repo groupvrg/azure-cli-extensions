@@ -194,6 +194,8 @@ def wait_for_blob_copy_operation(blob_name, target_container_name, target_storag
             if retries < 10:
                 time.sleep(20)
                 retries += 1
+            else:
+                raise ex
 
         if current_progress != prev_progress:
             msg = "{0} - Copy progress: {1}%"\
