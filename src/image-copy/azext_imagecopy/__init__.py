@@ -43,12 +43,17 @@ class ImageCopyCommandsLoader(AzCommandsLoader):
                        help='Name of the final image that will be created')
             c.argument('target_subscription', options_list=['--target-subscription'],
                        help='Name or ID of the subscription where the final image should be created.')
+
+            c.argument('timeout', options_list=['--timeout'], type=int, default=3600,
+                       help='Time in seconds for the copy operation to finish. Increase this time if '
+                       'you are going to copy large images (disks) like 512GB or more.')
+            c.argument('temporary_resource_group_name', options_list=['--temporary_resource_group_name'],
+                       default='image-copy-rg',
+                       help='Resource Group name where temporary storage account will be created.')
+            
             c.argument('manifest_file', options_list=['--manifest-file'], help="created images manifest file")
-            c.argument('temp_resource_group_name', options_list=['--temp-resource-group-name'], default="image-copy-rg",
-                       help="created images manifest file")
             c.argument('verify', options_list=['--verify'], action='store_true', default=False,
                        help='Verify all copies are successful')
-
 
 
 COMMAND_LOADER_CLS = ImageCopyCommandsLoader
