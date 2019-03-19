@@ -174,19 +174,26 @@ def wait_for_blob_copy_operation(blob_name, target_container_name, target_storag
                                  azure_pool_frequency, location, subscription):
     copy_status = "pending"
     prev_progress = -1
+    retries = 0
     while copy_status == "pending":
-        cli_cmd = prepare_cli_command(['storage', 'blob', 'show',
-                                       '--name', blob_name,
-                                       '--container-name', target_container_name,
-                                       '--account-name', target_storage_account_name],
-                                      subscription=subscription)
+        try:
+            cli_cmd = prepare_cli_command(['storage', 'blob', 'show',
+                                           '--name', blob_name,
+                                           '--container-name', target_container_name,
+                                           '--account-name', target_storage_account_name],
+                                          subscription=subscription)
 
-        json_output = run_cli_command(cli_cmd, return_as_json=True)
-        copy_status = json_output["properties"]["copy"]["status"]
-        copy_progress_1, copy_progress_2 = json_output["properties"]["copy"]["progress"].split(
-            "/")
-        current_progress = int(
-            int(copy_progress_1) / int(copy_progress_2) * 100)
+            json_output = run_cli_command(cli_cmd, return_as_json=True)
+            copy_status = json_output["properties"]["copy"]["status"]
+            copy_progress_1, copy_progress_2 = json_output["properties"]["copy"]["progress"].split(
+                "/")
+            current_progress = int(
+                int(copy_progress_1) / int(copy_progress_2) * 100)
+        except Exception as ex:
+            logger.warn("Got exception when trying to get blob: %s state, \n ex %s", blob_name, str(ex))
+            if retries < 10:
+                time.sleep(20)
+                retries += 1
 
         if current_progress != prev_progress:
             msg = "{0} - Copy progress: {1}%"\
